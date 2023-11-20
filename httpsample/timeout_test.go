@@ -24,7 +24,7 @@ func TestSimple200(t *testing.T) {
 	}
 	resp, err := c.Get(ts.URL)
 	if err != nil {
-		t.Error("HTTP Get", err)
+		t.Fatal("HTTP Get", err)
 	}
 	fmt.Printf("resp.Status: %#v\n", resp.Status)
 	fmt.Printf("resp.Body: %#v\n", resp.Body)
@@ -33,7 +33,7 @@ func TestSimple200(t *testing.T) {
 
 	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
-		t.Error("ReadAll", err)
+		t.Fatal("ReadAll", err)
 	}
 	fmt.Printf("Body: %s\n", bs)
 }
@@ -52,18 +52,12 @@ func TestTimeoutBeforeResponse(t *testing.T) {
 	c := &http.Client{
 		Timeout: 300 * time.Microsecond,
 	}
-	resp, err := c.Get(ts.URL)
+	_, err := c.Get(ts.URL)
 	if err != nil {
-		t.Error("HTTP Get", err)
+		// Go 1.12.3
+		// c.Get err: &url.Error{Op:"Get", URL:"http://127.0.0.1:39731", Err:(*http.httpError)(0xc0001340f0)}
+		t.Logf("c.Get err: %#v\n", err)
+		return
 	}
-	fmt.Printf("resp.Status: %#v\n", resp.Status)
-	fmt.Printf("resp.Body: %#v\n", resp.Body)
-
-	defer resp.Body.Close()
-
-	bs, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Error("ReadAll", err)
-	}
-	fmt.Printf("Body: %s\n", bs)
+	t.Fatal("Must not reach here")
 }
