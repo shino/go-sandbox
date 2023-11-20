@@ -54,10 +54,14 @@ func TestTimeoutBeforeResponse(t *testing.T) {
 	}
 	_, err := c.Get(ts.URL)
 	if err != nil {
-		// Go 1.12.3
-		// Output: c.Get err: &url.Error{Op:"Get", URL:"http://127.0.0.1:39731", Err:(*http.httpError)(0xc0001340f0)}
+		// Outputs are at Go 1.12.3
 		t.Logf("c.Get err")
+		// Output: c.Get err: &url.Error{Op:"Get", URL:"http://127.0.0.1:39731", Err:(*http.httpError)(0xc0001340f0)}
 		t.Logf("err: %#v", err)
+		// Output: Get "http://127.0.0.1:41883": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+		t.Logf("err: %+v", err)
+		// Output: Get "http://127.0.0.1:32919": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+		t.Logf("err: %s", err)
 		switch v := err.(type) {
 		case net.Error:
 			t.Logf("err is net.Error")
@@ -70,6 +74,55 @@ func TestTimeoutBeforeResponse(t *testing.T) {
 			t.Logf("err.Temporary(): %#v", v.Temporary())
 		default:
 			t.Fatalf("err is not net.Error: %#v", v)
+		}
+		return
+	}
+	t.Fatal("Must not reach here")
+}
+
+func TestTimeoutAtBodyRead(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(500 * time.Millisecond)
+		w.Header().Set("content-length", "5")
+		w.Header().Set("content-type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("123"))
+		go func() {
+			time.Sleep(2000 * time.Millisecond)
+			w.Write([]byte("45"))
+		}()
+	}))
+	defer ts.Close()
+
+	c := &http.Client{
+		Timeout: 1000 * time.Millisecond,
+	}
+	t.Log("About to Get")
+	resp, err := c.Get(ts.URL)
+	if err != nil {
+		t.Logf("err: %v", err)
+		t.Logf("err: %#v", err)
+		t.Fatal("HTTP Get", err)
+	}
+	t.Logf("resp.Status: %#v\n", resp.Status)
+
+	defer resp.Body.Close()
+
+	if _, err := io.ReadAll(resp.Body); err != nil {
+		// Outputs are at Go 1.12.3
+		t.Logf("c.Get err")
+		// Output: &errors.errorString{s:"unexpected EOF"}
+		t.Logf("err: %#v", err)
+		// Output: unexpected EOF
+		t.Logf("err: %v", err)
+		switch v := err.(type) {
+		case net.Error:
+			t.Logf("err is net.Error")
+			t.Logf("err.Error(): %#v", v.Error())
+			t.Logf("err.Timeout(): %#v", v.Timeout())
+			t.Logf("err.Temporary(): %#v", v.Temporary())
+		default:
+			// This clause is executed, err is not net.Error instance
 		}
 		return
 	}
