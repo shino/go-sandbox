@@ -3,6 +3,7 @@ package httpsample_test
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,8 +27,7 @@ func TestSimple200(t *testing.T) {
 	if err != nil {
 		t.Fatal("HTTP Get", err)
 	}
-	fmt.Printf("resp.Status: %#v\n", resp.Status)
-	fmt.Printf("resp.Body: %#v\n", resp.Body)
+	t.Logf("resp.Status: %#v\n", resp.Status)
 
 	defer resp.Body.Close()
 
@@ -55,8 +55,22 @@ func TestTimeoutBeforeResponse(t *testing.T) {
 	_, err := c.Get(ts.URL)
 	if err != nil {
 		// Go 1.12.3
-		// c.Get err: &url.Error{Op:"Get", URL:"http://127.0.0.1:39731", Err:(*http.httpError)(0xc0001340f0)}
-		t.Logf("c.Get err: %#v\n", err)
+		// Output: c.Get err: &url.Error{Op:"Get", URL:"http://127.0.0.1:39731", Err:(*http.httpError)(0xc0001340f0)}
+		t.Logf("c.Get err")
+		t.Logf("err: %#v", err)
+		switch v := err.(type) {
+		case net.Error:
+			t.Logf("err is net.Error")
+			// Get \"http://127.0.0.1:36335\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+			t.Logf("err.Error(): %#v", v.Error())
+			// Output: true
+			t.Logf("err.Timeout(): %#v", v.Timeout())
+			// Output: true
+			// !!Deprecated!!
+			t.Logf("err.Temporary(): %#v", v.Temporary())
+		default:
+			t.Fatalf("err is not net.Error: %#v", v)
+		}
 		return
 	}
 	t.Fatal("Must not reach here")
